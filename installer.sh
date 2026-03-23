@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# KELMORA CLOUD - UNIVERSAL PRODUCTION PROVISIONER (v11.0)
+# KELMORA CLOUD - UNIVERSAL PRODUCTION PROVISIONER (v11.1)
 # ==============================================================================
 
 if [[ $EUID -ne 0 ]]; then
@@ -57,9 +57,11 @@ _kelmora_spinner() {
 
 kelmora_clean() {
     echo -en "\033[1;33m🧹 Sweeping system cache and applying updates...\033[0m"
-    (sudo apt-get update -qq && sudo apt-get dist-upgrade -y -qq && sudo apt-get autoremove -y -qq && sudo apt-get autoclean -qq) > /dev/null 2>&1 &
+    set +m
+    (sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq && sudo apt-get autoclean -qq) > /dev/null 2>&1 &
     _kelmora_spinner $!
-    echo -e "\r\033[1;32m✨ Kelmora Cloud: OS Refreshed, Updated, and Optimized!\033[0m"
+    set -m
+    echo -e "\r\033[1;32m✨ Kelmora Cloud: OS Refreshed, Updated, and Optimized!\033[0m\033[K"
 }
 
 kelmora_audit() {
@@ -86,9 +88,9 @@ kelmora_services() {
             found=true
             echo -en "   Checking $s... "
             if systemctl is-active --quiet $s; then
-                echo -e "\r \033[0;32m🟢 $s is ONLINE and running.\033[0m"
+                echo -e "\r \033[0;32m🟢 $s is ONLINE and running.\033[0m\033[K"
             else
-                echo -e "\r \033[0;31m🔴 $s is OFFLINE.\033[0m"
+                echo -e "\r \033[0;31m🔴 $s is OFFLINE.\033[0m\033[K"
             fi
             sleep 0.1
         fi
@@ -99,19 +101,23 @@ kelmora_services() {
 kelmora_swap() {
     echo -en "\033[1;33m⚙️  Allocating 4GB Emergency Swap Memory...\033[0m"
     if [ -f /swapfile ]; then
-        echo -e "\r\033[1;34mℹ️  Kelmora Cloud: Swap file already exists on this node.\033[0m"
+        echo -e "\r\033[1;34mℹ️  Kelmora Cloud: Swap file already exists on this node.\033[0m\033[K"
     else
+        set +m
         (sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab) > /dev/null 2>&1 &
         _kelmora_spinner $!
-        echo -e "\r\033[1;32m✅ Kelmora Cloud: 4GB Swap Activated Successfully!\033[0m"
+        set -m
+        echo -e "\r\033[1;32m✅ Kelmora Cloud: 4GB Swap Activated Successfully!\033[0m\033[K"
     fi
 }
 
 kelmora_secure() {
     echo -en "\033[1;33m🛡️  Locking down external ports (allowing 22, 80, 443)...\033[0m"
+    set +m
     (sudo ufw default deny incoming && sudo ufw default allow outgoing && sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw --force enable) > /dev/null 2>&1 &
     _kelmora_spinner $!
-    echo -e "\r\033[1;32m🛡️  Kelmora Shield: ACTIVE. Server is secured.\033[0m"
+    set -m
+    echo -e "\r\033[1;32m🛡️  Kelmora Shield: ACTIVE. Server is secured.\033[0m\033[K"
 }
 
 kelmora_unsecure() {
