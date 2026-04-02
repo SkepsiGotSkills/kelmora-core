@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# KELMORA CLOUD - THE "SIGNATURE BUILD" OMNI-OS PROVISIONER (SINGULARITY)
+# KELMORA CLOUD - THE "SIGNATURE BUILD" OMNI-OS PROVISIONER (TITANIUM EDITION)
 # ==============================================================================
 
 # Disable history expansion to prevent paste-crashes
@@ -22,7 +22,7 @@ trap 'tput cnorm; echo -e "\n\033[1;31mInstallation aborted.\033[0m"; exit 1' IN
 
 clear
 echo -e "${KC}======================================================================${NC}"
-echo -e "\033[1;37m  🚀 INITIALIZING KELMORA SIGNATURE OS: SINGULARITY BUILD\033[0m"
+echo -e "\033[1;37m  🚀 INITIALIZING KELMORA SIGNATURE OS: TITANIUM BUILD\033[0m"
 echo -e "${KC}======================================================================${NC}"
 echo ""
 
@@ -49,11 +49,20 @@ step_hw_check() {
 step_scrub() {
     rm -f /usr/bin/kelmora-* /usr/local/bin/kelmora-* /bin/kelmora-* || true
     rm -f /etc/sudoers.d/kelmora /etc/kelmora_env.sh /etc/profile.d/kelmora_welcome.sh || true
+    
+    # Nuclear scrub of corrupted color codes and old prompts from previous crashed versions
     sed -i '/_kelmora_prompt/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/PROMPT_COMMAND/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/starship init/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/zoxide init/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/FZF_DEFAULT_OPTS/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
+    
+    # Surgical removal of the specific '\E[1' ghost strings
+    sed -i '/\\E\[1/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
+    sed -i '/31m\[K\]/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
+    sed -i '/33m\[K\]/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
+    sed -i '/37m\[K\]/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
+    sed -i "/\$'\\\\E\[1'/d" /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
 }
 
 step_kernel_optim() {
@@ -68,7 +77,7 @@ step_kernel_optim() {
 step_deps() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat fzf ripgrep fd-find lnav nala duf
+    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat ripgrep fd-find lnav nala duf
     ln -sf /usr/bin/batcat /usr/local/bin/bat || true
 }
 
@@ -78,7 +87,7 @@ step_ookla() {
 }
 
 step_rust_binaries() {
-    # Fetch eza, bottom, zellij, gping, lazygit, tealdeer, and micro
+    # Fetch core binaries dynamically
     wget -qO /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" && tar -xzf /tmp/eza.tar.gz -C /tmp/ && mv /tmp/eza /usr/local/bin/eza && chmod +x /usr/local/bin/eza
     wget -qO /tmp/btm.tar.gz "https://github.com/ClementTsang/bottom/releases/latest/download/bottom_x86_64-unknown-linux-gnu.tar.gz" && tar -xzf /tmp/btm.tar.gz -C /tmp/ && mv /tmp/btm /usr/local/bin/btm && chmod +x /usr/local/bin/btm
     wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz" && tar -xzf /tmp/zellij.tar.gz -C /tmp/ && mv /tmp/zellij /usr/local/bin/zellij && chmod +x /usr/local/bin/zellij
@@ -89,17 +98,28 @@ step_rust_binaries() {
     curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash && mv ~/.local/bin/zoxide /usr/local/bin/ || true
     curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
     
+    # Flawless Lazygit Fetch
     LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
     wget -qO /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
     tar -xzf /tmp/lazygit.tar.gz -C /tmp/ lazygit && mv /tmp/lazygit /usr/local/bin/lazygit && chmod +x /usr/local/bin/lazygit
 
+    # Flawless Yazi Fetch
     wget -qO /tmp/yazi.zip "https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip"
-    unzip -qo /tmp/yazi.zip -d /tmp/ && mv /tmp/yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/yazi && chmod +x /usr/local/bin/yazi
+    unzip -qo /tmp/yazi.zip -d /tmp/
+    find /tmp/ -name "yazi" -type f -executable -exec mv {} /usr/local/bin/yazi \;
+    chmod +x /usr/local/bin/yazi
+    rm -rf /tmp/yazi*
+    
+    # Flawless FZF Fetch (Bypassing APT completely)
+    FZF_VERSION=$(curl -s "https://api.github.com/repos/junegunn/fzf/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    wget -qO /tmp/fzf.tar.gz "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_amd64.tar.gz"
+    tar -xzf /tmp/fzf.tar.gz -C /tmp/ fzf && mv /tmp/fzf /usr/local/bin/fzf && chmod +x /usr/local/bin/fzf
 }
 
 step_fastfetch() {
     wget -qO /tmp/fastfetch.tar.gz "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.tar.gz"
     tar -xzf /tmp/fastfetch.tar.gz -C /tmp/ && mv /tmp/fastfetch-*/usr/bin/fastfetch /usr/local/bin/fastfetch && chmod +x /usr/local/bin/fastfetch
+    rm -rf /tmp/fastfetch*
     
     sudo tee /etc/kelmora_logo.txt > /dev/null << 'EOF'
     //\       K E L M O R A
@@ -165,7 +185,6 @@ unset PROMPT_COMMAND
 export PS1='[\u@\h \W]\$ '
 if command -v starship &> /dev/null; then eval "$(starship init bash 2>/dev/null)"; fi
 if command -v zoxide &> /dev/null; then eval "$(zoxide init bash 2>/dev/null)"; fi
-[ -f /usr/share/doc/fzf/examples/key-bindings.bash ] && source /usr/share/doc/fzf/examples/key-bindings.bash
 
 alias ls='eza --icons --color=always --group-directories-first'
 alias ll='eza -la --icons --color=always --group-directories-first'
@@ -195,7 +214,11 @@ kelmora() {
     local cmd=$1
     shift
     if [[ -z "$cmd" ]]; then
-        local choice=$(printf "os\ninfo\nservices\noptimizer\nscan\nstats\ndisk\nbench\nworkspace\ndocker-ui\ngit\nfiles\nlogs-view\nread\nls\ntree\nsecure\nspeedtest\ntraffic\nping\nhelp\nreboot" | fzf --height 40% --layout=reverse --border --prompt="Kelmora Center ❯ " --header="Select a module to engage")
+        if ! command -v fzf &> /dev/null; then
+            echo -e "\033[1;31m[K] ❌ FZF engine missing. Please run 'bash install.sh' again to repair dependencies.\033[0m"
+            return
+        fi
+        local choice=$(printf "os\ninfo\nservices\noptimizer\nscan\nstats\ndisk\nbench\nworkspace\ndocker-ui\ngit\nfiles\nlogs-view\nread\nls\ntree\nsecure\nspeedtest\ntraffic\nping\nhelp\nreboot" | fzf --height 40% --layout=reverse --border --prompt="Kelmora Center ❯ " --header="Select a module to engage" 2>/dev/null)
         [[ -z "$choice" ]] && return
         kelmora "$choice" "$@"
         return
@@ -298,9 +321,9 @@ main() {
     _run_task "Performing deep disk integrity check..." step_hw_check
     _run_task "Injecting Kernel Speed Optimizations (TCP BBR)..." step_kernel_optim
     _run_task "Purging ghost configurations..." step_scrub
-    _run_task "Fetching Massive Dependency Library (Nala, Bat, FZF)..." step_deps
+    _run_task "Fetching Massive Dependency Library (Nala, Bat, etc)..." step_deps
     _run_task "Hooking into Ookla Speedtest repositories..." step_ookla
-    _run_task "Forging TUI Workspaces (Zellij, Lazygit, Yazi, Gping)..." step_rust_binaries
+    _run_task "Forging TUI Workspaces (Zellij, Lazygit, Yazi, FZF, etc)..." step_rust_binaries
     _run_task "Deploying OS Identity Engine (Fastfetch)..." step_fastfetch
     _run_task "Forging Starship Rust-Engine Prompt..." step_starship
     _run_task "Injecting Kelmora Interactive Command Center..." step_cli_engine
