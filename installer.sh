@@ -1,6 +1,7 @@
 #!/bin/bash
 # ==============================================================================
-# KELMORA CLOUD - THE "SIGNATURE BUILD" OMNI-OS PROVISIONER (FLAWLESS)
+# KELMORA CLOUD - THE "SINGULARITY CORE" OMNI-OS PROVISIONER
+# VERSION: 23.0 (TITANIUM MASTER BUILD)
 # ==============================================================================
 
 # Disable history expansion to guarantee 100% paste safety
@@ -22,7 +23,7 @@ trap 'tput cnorm; echo -e "\n\033[1;31mInstallation aborted.\033[0m"; exit 1' IN
 
 clear
 echo -e "${KC}======================================================================${NC}"
-echo -e "\033[1;37m  🚀 INITIALIZING KELMORA SIGNATURE OS: THE ECOSYSTEM BUILD\033[0m"
+echo -e "\033[1;37m  🚀 INITIALIZING KELMORA SIGNATURE OS: SINGULARITY CORE\033[0m"
 echo -e "${KC}======================================================================${NC}"
 echo ""
 
@@ -31,7 +32,6 @@ _run_task() {
     local msg="$1"
     local func="$2"
     
-    # Start the spinner in an isolated, disowned background thread
     (
         local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
         while true; do
@@ -44,18 +44,29 @@ _run_task() {
     local spinner_pid=$!
     disown $spinner_pid 2>/dev/null || true
     
-    # Execute the actual task silently in the foreground
     $func >/dev/null 2>&1
     
-    # Kill the spinner gracefully and print success
     kill -9 $spinner_pid 2>/dev/null || true
     wait $spinner_pid 2>/dev/null || true
     printf "\r\033[1;32m [✓] \033[1;37m%s\033[0m\033[K\n" "$msg"
-    sleep 0.1 # Cinematic micro-delay
+    sleep 0.1 
+}
+
+# --- Dynamic GitHub API Fetcher (Bulletproof Downloads) ---
+_fetch_github_binary() {
+    local repo="$1"
+    local pattern="$2"
+    local out_name="$3"
+    local api_url="https://api.github.com/repos/${repo}/releases/latest"
+    local download_url=$(curl -s "$api_url" | grep "browser_download_url.*${pattern}" | head -n 1 | cut -d '"' -f 4)
+    
+    if [[ -n "$download_url" ]]; then
+        wget -qO "/tmp/${out_name}" "$download_url"
+    fi
 }
 
 # ============================================================
-# 🛠️ SYSTEM PREPARATION & KERNEL TUNING
+# 🛠️ STAGE 1: SYSTEM PREPARATION & KERNEL TUNING
 # ============================================================
 
 step_hw_check() {
@@ -67,7 +78,6 @@ step_hw_check() {
 step_scrub() {
     rm -f /usr/bin/kelmora-* /usr/local/bin/kelmora-* /bin/kelmora-* || true
     rm -f /etc/sudoers.d/kelmora /etc/kelmora_env.sh /etc/profile.d/kelmora_welcome.sh || true
-    
     sed -i '/_kelmora_prompt/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/PROMPT_COMMAND/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/starship init/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
@@ -78,7 +88,6 @@ step_scrub() {
 step_kernel_optim() {
     # Deep Kernel Tuning for High-Performance Cloud/Game Servers
     sudo tee -a /etc/sysctl.conf > /dev/null << 'EOF'
-# Kelmora Network & Memory Optimizations
 net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
 net.ipv4.tcp_fastopen=3
@@ -95,16 +104,24 @@ vm.dirty_ratio=10
 vm.dirty_background_ratio=5
 EOF
     sysctl -p > /dev/null 2>&1
+
+    # Lift file descriptor limits for massive game servers
+    sudo tee -a /etc/security/limits.conf > /dev/null << 'EOF'
+* soft nofile 1048576
+* hard nofile 1048576
+root soft nofile 1048576
+root hard nofile 1048576
+EOF
 }
 
 # ============================================================
-# 🛠️ DEPENDENCY & OPEN SOURCE INTEGRATIONS
+# 🛠️ STAGE 2: DEPENDENCY & OPEN SOURCE INTEGRATIONS
 # ============================================================
 
 step_deps() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat ripgrep fd-find lnav nala duf
+    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat ripgrep fd-find lnav nala ffmpeg 7zip poppler-utils imagemagick
     ln -sf /usr/bin/batcat /usr/local/bin/bat || true
 }
 
@@ -115,67 +132,75 @@ step_ookla() {
 
 step_rust_binaries() {
     # 1. Eza (Next-Gen LS)
-    wget -qO /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz"
+    _fetch_github_binary "eza-community/eza" "x86_64-unknown-linux-gnu.tar.gz" "eza.tar.gz"
     mkdir -p /tmp/eza_tmp && tar -xzf /tmp/eza.tar.gz -C /tmp/eza_tmp
     find /tmp/eza_tmp -type f -name "eza" -exec mv {} /usr/local/bin/eza \;
     chmod +x /usr/local/bin/eza
-    
+
     # 2. Bottom (Next-Gen Htop)
-    wget -qO /tmp/btm.tar.gz "https://github.com/ClementTsang/bottom/releases/latest/download/bottom_x86_64-unknown-linux-gnu.tar.gz"
+    _fetch_github_binary "ClementTsang/bottom" "x86_64-unknown-linux-gnu.tar.gz" "btm.tar.gz"
     mkdir -p /tmp/btm_tmp && tar -xzf /tmp/btm.tar.gz -C /tmp/btm_tmp
     find /tmp/btm_tmp -type f -name "btm" -exec mv {} /usr/local/bin/btm \;
     chmod +x /usr/local/bin/btm
-    
+
     # 3. Zellij (Terminal Multiplexer)
-    wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz"
+    _fetch_github_binary "zellij-org/zellij" "x86_64-unknown-linux-musl.tar.gz" "zellij.tar.gz"
     mkdir -p /tmp/zellij_tmp && tar -xzf /tmp/zellij.tar.gz -C /tmp/zellij_tmp
     find /tmp/zellij_tmp -type f -name "zellij" -exec mv {} /usr/local/bin/zellij \;
     chmod +x /usr/local/bin/zellij
-    
+
     # 4. Gping (Visual Ping Graph)
-    wget -qO /tmp/gping.tar.gz "https://github.com/orf/gping/releases/latest/download/gping-x86_64-unknown-linux-gnu.tar.gz" || wget -qO /tmp/gping.tar.gz "https://github.com/orf/gping/releases/latest/download/gping-Linux-x86_64.tar.gz"
+    _fetch_github_binary "orf/gping" "x86_64-unknown-linux-musl.tar.gz\|Linux-x86_64.tar.gz" "gping.tar.gz"
     mkdir -p /tmp/gping_tmp && tar -xzf /tmp/gping.tar.gz -C /tmp/gping_tmp
     find /tmp/gping_tmp -type f -name "gping" -exec mv {} /usr/local/bin/gping \;
     chmod +x /usr/local/bin/gping
-    
-    # 5. Tealdeer (Rust TLDR for command examples)
-    wget -qO /usr/local/bin/tldr "https://github.com/dbrgn/tealdeer/releases/latest/download/tldr-linux-x86_64-musl" && chmod +x /usr/local/bin/tldr
-    
-    # 6. Micro (Modern Text Editor)
-    curl -sL https://getmic.ro | bash && mv micro /usr/local/bin/
-    
-    # 7. Zoxide (Smart Navigation)
-    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash && mv ~/.local/bin/zoxide /usr/local/bin/ || true
-    
-    # 8. Lazydocker (Docker Dashboard)
-    curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
-    
-    # 9. Lazygit (Git Visual UI)
-    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-    wget -qO /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+
+    # 5. Duf (Visual Disk Usage)
+    _fetch_github_binary "muesli/duf" "linux_x86_64.tar.gz" "duf.tar.gz"
+    mkdir -p /tmp/duf_tmp && tar -xzf /tmp/duf.tar.gz -C /tmp/duf_tmp
+    find /tmp/duf_tmp -type f -name "duf" -exec mv {} /usr/local/bin/duf \;
+    chmod +x /usr/local/bin/duf
+
+    # 6. FZF (Fuzzy Finder - Bypassing APT for perfect compatibility)
+    _fetch_github_binary "junegunn/fzf" "linux_amd64.tar.gz" "fzf.tar.gz"
+    mkdir -p /tmp/fzf_tmp && tar -xzf /tmp/fzf.tar.gz -C /tmp/fzf_tmp
+    find /tmp/fzf_tmp -type f -name "fzf" -exec mv {} /usr/local/bin/fzf \;
+    chmod +x /usr/local/bin/fzf
+
+    # 7. Lazygit (Git Visual UI)
+    _fetch_github_binary "jesseduffield/lazygit" "Linux_x86_64.tar.gz" "lazygit.tar.gz"
     mkdir -p /tmp/lazygit_tmp && tar -xzf /tmp/lazygit.tar.gz -C /tmp/lazygit_tmp
     find /tmp/lazygit_tmp -type f -name "lazygit" -exec mv {} /usr/local/bin/lazygit \;
     chmod +x /usr/local/bin/lazygit
 
-    # 10. Yazi (File Explorer)
-    wget -qO /tmp/yazi.zip "https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip"
+    # 8. Yazi (File Explorer - Extracts both 'yazi' and 'ya' binaries)
+    _fetch_github_binary "sxyazi/yazi" "x86_64-unknown-linux-gnu.zip" "yazi.zip"
     mkdir -p /tmp/yazi_tmp && unzip -qo /tmp/yazi.zip -d /tmp/yazi_tmp
     find /tmp/yazi_tmp -type f -name "yazi" -exec mv {} /usr/local/bin/yazi \;
-    chmod +x /usr/local/bin/yazi
+    find /tmp/yazi_tmp -type f -name "ya" -exec mv {} /usr/local/bin/ya \;
+    chmod +x /usr/local/bin/yazi /usr/local/bin/ya
 
-    # 11. FZF Engine (Direct GitHub Fetch for absolute stability)
-    FZF_VERSION=$(curl -s "https://api.github.com/repos/junegunn/fzf/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-    wget -qO /tmp/fzf.tar.gz "https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}/fzf-${FZF_VERSION}-linux_amd64.tar.gz"
-    tar -xzf /tmp/fzf.tar.gz -C /tmp/ && mv /tmp/fzf /usr/local/bin/fzf && chmod +x /usr/local/bin/fzf
+    # 9. Tealdeer (Rust TLDR)
+    _fetch_github_binary "dbrgn/tealdeer" "linux-x86_64-musl" "tldr"
+    mv /tmp/tldr /usr/local/bin/tldr && chmod +x /usr/local/bin/tldr
+
+    # 10. Zoxide & Micro & Lazydocker
+    curl -sL https://getmic.ro | bash && mv micro /usr/local/bin/
+    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash && mv ~/.local/bin/zoxide /usr/local/bin/ || true
+    curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
+    
+    rm -rf /tmp/*_tmp /tmp/*.tar.gz /tmp/*.zip
 }
 
 # ============================================================
-# 🎨 CUSTOM CONFIGURATIONS & THEMING
+# 🎨 STAGE 3: CUSTOM CONFIGURATIONS & THEMING
 # ============================================================
 
 step_fastfetch() {
-    wget -qO /tmp/fastfetch.tar.gz "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.tar.gz"
-    tar -xzf /tmp/fastfetch.tar.gz -C /tmp/ && mv /tmp/fastfetch-*/usr/bin/fastfetch /usr/local/bin/fastfetch && chmod +x /usr/local/bin/fastfetch
+    _fetch_github_binary "fastfetch-cli/fastfetch" "linux-amd64.tar.gz" "fastfetch.tar.gz"
+    mkdir -p /tmp/ff_tmp && tar -xzf /tmp/fastfetch.tar.gz -C /tmp/ff_tmp
+    find /tmp/ff_tmp -type f -name "fastfetch" -exec mv {} /usr/local/bin/fastfetch \;
+    chmod +x /usr/local/bin/fastfetch
     
     sudo tee /etc/kelmora_logo.txt > /dev/null << 'EOF'
     //\       K E L M O R A
@@ -201,59 +226,74 @@ step_starship() {
     sudo tee /etc/starship.toml > /dev/null << 'EOF'
 add_newline = false
 command_timeout = 1000
-
 format = "$time$custom$username$hostname$directory$git_branch$git_status$nodejs$java$python$cmd_duration$character"
-
 [time]
 disabled = false
 time_format = "%T"
 format = '[\[$time\]](#10968A) [\[K\]](bold #10968A) '
-
 [username]
 show_always = true
 style_user = "bold white"
 style_root = "bold white"
 format = "[$user]($style)"
-
 [hostname]
 ssh_only = false
 style = "bold white"
 format = "@[$hostname]($style):"
-
 [directory]
 style = "bold #10968A"
 read_only = " 🔒"
 truncate_to_repo = true
 format = "[$path]($style)"
-
 [character]
 success_symbol = "[❯](bold white) "
 error_symbol = "[❌ ❯](bold red) "
-
 [cmd_duration]
 min_time = 2000
 format = "took [$duration](#10968A) "
-
 [git_branch]
 symbol = "🌱 "
 style = "bold purple"
-
 [nodejs]
 symbol = "🟩 "
 format = "via [$symbol$version](bold green) "
-
 [java]
 symbol = "☕ "
 format = "via [$symbol$version](bold blue) "
-
 [python]
 symbol = "🐍 "
 format = "via [$symbol$version](bold yellow) "
 EOF
 }
 
+step_tui_configs() {
+    # Generate Kelmora Theme for Zellij
+    mkdir -p /root/.config/zellij/themes
+    sudo tee /root/.config/zellij/config.kdl > /dev/null << 'EOF'
+theme "kelmora"
+default_layout "compact"
+EOF
+    sudo tee /root/.config/zellij/themes/kelmora.kdl > /dev/null << 'EOF'
+themes {
+    kelmora {
+        fg "#ffffff"
+        bg "#000000"
+        black "#000000"
+        red "#ff5555"
+        green "#50fa7b"
+        yellow "#f1fa8c"
+        blue "#10968A"
+        magenta "#ff79c6"
+        cyan "#10968A"
+        white "#ffffff"
+        orange "#ffb86c"
+    }
+}
+EOF
+}
+
 # ============================================================
-# 🧠 THE UNIFIED COMMAND ENGINE
+# 🧠 STAGE 4: THE UNIFIED COMMAND ENGINE
 # ============================================================
 
 step_cli_engine() {
@@ -279,11 +319,6 @@ export PS1='[\u@\h \W]\$ '
 if command -v starship &> /dev/null; then eval "$(starship init bash 2>/dev/null)"; fi
 if command -v zoxide &> /dev/null; then eval "$(zoxide init bash 2>/dev/null)"; fi
 
-# Inject FZF Keybindings (Ctrl+R for History)
-if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
-    source /usr/share/doc/fzf/examples/key-bindings.bash
-fi
-
 # --- Universal Aliases for Quantum Tools ---
 alias ls='eza --icons --color=always --group-directories-first'
 alias ll='eza -la --icons --color=always --group-directories-first'
@@ -299,21 +334,7 @@ command_not_found_handle() {
     return 127
 }
 
-# --- Visual Navigation ---
-cd() {
-    builtin cd "$@" && echo -e "\033[38;2;16;150;138m📂 $(pwd):\033[0m" && eza --icons --color=always --group-directories-first
-}
-
-# --- Kelmora Cinematic UI Loaders ---
-_k_typewriter() {
-    text="$1"
-    delay="$2"
-    for (( i=0; i<${#text}; i++ )); do
-        echo -n "${text:$i:1}"
-        sleep $delay
-    done
-    echo ""
-}
+cd() { builtin cd "$@" && echo -e "\033[38;2;16;150;138m📂 $(pwd):\033[0m" && eza --icons --color=always --group-directories-first; }
 
 _k_loader() {
     local msg="$1"
@@ -335,11 +356,10 @@ kelmora() {
     # 1. Interactive Menu Logic (FZF)
     if [[ -z "$cmd" ]]; then
         if ! command -v fzf &> /dev/null; then
-            echo -e "\033[1;31m[K] ❌ FZF engine missing. Please run 'bash install.sh' again to repair dependencies.\033[0m"
+            echo -e "\033[1;31m[K] ❌ FZF engine missing. Please run the installer again.\033[0m"
             return
         fi
         
-        # Massive, descriptive table for FZF
         local choices="os          | Generate Kelmora Hardware Identity (Fastfetch)
 info        | Print raw CPU, Kernel, and Architecture data
 services    | Scan and view local Application Health Matrix
@@ -379,13 +399,9 @@ help        | Display the full static Command Matrix
 reboot      | Safely reboot the operating system node"
 
         local selection=$(echo "$choices" | column -s '|' -t | fzf --height 60% --layout=reverse --border --prompt="Kelmora Center ❯ " --header="[ Arrow Keys to Navigate • Enter to Execute ]" 2>/dev/null)
-        
-        # Extract the exact command before the whitespace
         local parsed_cmd=$(echo "$selection" | awk '{print $1}')
         
-        if [[ -n "$parsed_cmd" ]]; then
-            kelmora "$parsed_cmd" "$@"
-        fi
+        if [[ -n "$parsed_cmd" ]]; then kelmora "$parsed_cmd" "$@"; fi
         return
     fi
 
@@ -443,7 +459,7 @@ _k_help() {
     echo -e "\033[38;2;16;150;138m======================================================================\033[0m"
     echo -e "\033[1;37m         KELMORA CLOUD SIGNATURE BUILD - COMMAND MATRIX\033[0m"
     echo -e "\033[38;2;16;150;138m======================================================================\033[0m"
-    echo -e "\033[1;37mUsage: \033[38;2;16;150;138mkelmora \033[1;37m<module>   (Or just type \033[38;2;16;150;138mkelmora\033[1;37m for the menu)\033[0m"
+    echo -e "\033[1;37m Usage: \033[38;2;16;150;138mkelmora \033[1;37m<module>   (Or just type \033[38;2;16;150;138mkelmora\033[1;37m for the menu)\033[0m"
     echo -e "\033[38;2;16;150;138m----------------------------------------------------------------------\033[0m"
     echo -e "\033[1;37m[🛠️  SYSTEM & OPTIMIZATION]\033[0m"
     echo -e " \033[38;2;16;150;138mkelmora os\033[0m              - Next-Gen System Identity Readout (Fastfetch)"
@@ -498,7 +514,7 @@ EOF
 }
 
 # ============================================================
-# 🖥️ DASHBOARD & UI ELEMENTS
+# 🖥️ STAGE 5: DASHBOARD & UI ELEMENTS
 # ============================================================
 
 step_motd() {
@@ -567,17 +583,18 @@ EOF
 }
 
 # ============================================================
-# ⚙️ MAIN EXECUTION
+# ⚙️ MAIN EXECUTION SANDBOX
 # ============================================================
 
 main() {
     _run_task "Performing deep disk integrity check..." step_hw_check
     _run_task "Injecting Kernel Speed Optimizations (TCP BBR)..." step_kernel_optim
     _run_task "Purging ghost configurations..." step_scrub
-    _run_task "Fetching Massive Dependency Library (Nala, Bat, FZF)..." step_deps
+    _run_task "Fetching Massive Dependency Library (Nala, Lnav, FZF)..." step_deps
     _run_task "Hooking into Ookla Speedtest repositories..." step_ookla
     _run_task "Forging TUI Workspaces (Zellij, Lazygit, Yazi, Gping)..." step_rust_binaries
-    _run_task "Deploying OS Identity Engine (Fastfetch)..." step_fastfetch
+    _run_task "Deploying Custom OS Identity Engine (Fastfetch)..." step_fastfetch
+    _run_task "Deploying Custom TUI Color Themes..." step_tui_configs
     _run_task "Forging Starship Rust-Engine Prompt..." step_starship
     _run_task "Injecting Kelmora Interactive Command Center..." step_cli_engine
     _run_task "Compiling Signature Heartbeat Dashboard..." step_motd
@@ -591,7 +608,7 @@ main() {
     echo -e "${KC}======================================================================${NC}"
     echo -e "\033[1;32m  ✅ KELMORA SIGNATURE OS INSTALLED SUCCESSFULLY \033[0m"
     echo -e "${KC}======================================================================${NC}"
-    echo -e "\033[1;31m⚠️  CRITICAL: Close this terminal and log back in to activate! \033[0m"
+    echo -e "\033[1;31m⚠️  CRITICAL: Close this terminal completely and log back in to activate! \033[0m"
 }
 
 main "$@"
