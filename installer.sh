@@ -1,11 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-# KELMORA CLOUD - THE "SIGNATURE BUILD" OMNI-OS PROVISIONER (SINGULARITY)
+# KELMORA CLOUD - THE "SIGNATURE BUILD" OMNI-OS PROVISIONER (BULLETPROOF)
 # ==============================================================================
 
-# Disable Bash history expansion to prevent ! paste-crashes
+# Disable history expansion to prevent paste-crashes
 set +H 
-set +m
 
 if [[ $EUID -ne 0 ]]; then
    echo -e "\033[0;31m❌ Error: This script must be run as root (use sudo).\033[0m"
@@ -18,7 +17,6 @@ NC="\033[0m"
 
 # Hide the blinking cursor for a polished Apple-like feel
 tput civis
-# Ensure the cursor comes back if the user force-quits (Ctrl+C)
 trap 'tput cnorm; echo -e "\n\033[1;31mInstallation aborted.\033[0m"; exit 1' INT TERM
 
 clear
@@ -27,32 +25,19 @@ echo -e "\033[1;37m  🚀 INITIALIZING KELMORA SIGNATURE OS DEPLOYMENT\033[0m"
 echo -e "${KC}======================================================================${NC}"
 echo ""
 
-# --- The "Apple Magic" Synchronous Braille Loader ---
+# --- The Synchronous Safe Loader ---
 _run_task() {
     local msg="$1"
     local func="$2"
     
-    # Start the spinner in an isolated, disowned background thread
-    (
-        local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-        while true; do
-            for frame in "${frames[@]}"; do
-                printf "\r${KC} [%s] ${NC}\033[1;37m%s\033[0m\033[K" "$frame" "$msg"
-                sleep 0.08
-            done
-        done
-    ) &
-    local spinner_pid=$!
-    disown $spinner_pid 2>/dev/null || true
+    # Print the waiting status
+    echo -en "${KC}[⏳]${NC} \033[1;37m${msg}\033[0m"
     
-    # Execute the actual task silently in the foreground
+    # Execute the task silently
     $func >/dev/null 2>&1
     
-    # Kill the spinner gracefully and print success
-    kill -9 $spinner_pid 2>/dev/null || true
-    wait $spinner_pid 2>/dev/null || true
-    printf "\r\033[1;32m [✓] \033[1;37m%s\033[0m\033[K\n" "$msg"
-    sleep 0.1 # Cinematic micro-delay
+    # Overwrite with success status
+    echo -e "\r\033[1;32m[✅] \033[1;37m${msg}\033[0m\033[K"
 }
 
 # ============================================================
@@ -75,7 +60,6 @@ step_scrub() {
     sed -i '/starship init/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/zoxide init/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
     sed -i '/FZF_DEFAULT_OPTS/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
-    sed -i '/fzf/d' /root/.bashrc /home/*/.bashrc /etc/bash.bashrc 2>/dev/null || true
 }
 
 step_deps() {
@@ -92,22 +76,24 @@ step_ookla() {
 
 step_rust_binaries() {
     # Core TUIs
-    curl -sL https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /tmp/ && mv /tmp/eza /usr/local/bin/eza && chmod +x /usr/local/bin/eza
-    curl -sL https://github.com/ClementTsang/bottom/releases/latest/download/bottom_x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /tmp/ && mv /tmp/btm /usr/local/bin/btm && chmod +x /usr/local/bin/btm
+    wget -qO /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" && tar -xzf /tmp/eza.tar.gz -C /tmp/ && mv /tmp/eza /usr/local/bin/eza && chmod +x /usr/local/bin/eza
+    wget -qO /tmp/btm.tar.gz "https://github.com/ClementTsang/bottom/releases/latest/download/bottom_x86_64-unknown-linux-gnu.tar.gz" && tar -xzf /tmp/btm.tar.gz -C /tmp/ && mv /tmp/btm /usr/local/bin/btm && chmod +x /usr/local/bin/btm
+    wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz" && tar -xzf /tmp/zellij.tar.gz -C /tmp/ && mv /tmp/zellij /usr/local/bin/zellij && chmod +x /usr/local/bin/zellij
+    wget -qO /tmp/gping.tar.gz "https://github.com/orf/gping/releases/latest/download/gping-x86_64-unknown-linux-musl.tar.gz" && tar -xzf /tmp/gping.tar.gz -C /tmp/ && mv /tmp/gping /usr/local/bin/gping && chmod +x /usr/local/bin/gping
+    
     curl -sL https://getmic.ro | bash && mv micro /usr/local/bin/
     curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash && mv ~/.local/bin/zoxide /usr/local/bin/ || true
-    curl -sL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz | tar -xz -C /tmp/ && mv /tmp/zellij /usr/local/bin/zellij && chmod +x /usr/local/bin/zellij
-    curl -sL https://github.com/orf/gping/releases/latest/download/gping-x86_64-unknown-linux-musl.tar.gz | tar -xz -C /tmp/ && mv /tmp/gping /usr/local/bin/gping && chmod +x /usr/local/bin/gping
     curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
     
     # Lazygit
     LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-    curl -sL "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" | tar -xz -C /tmp/ && mv /tmp/lazygit /usr/local/bin/lazygit && chmod +x /usr/local/bin/lazygit
+    wget -qO /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+    tar -xzf /tmp/lazygit.tar.gz -C /tmp/ lazygit && mv /tmp/lazygit /usr/local/bin/lazygit && chmod +x /usr/local/bin/lazygit
 
     # Yazi (File Explorer)
     wget -qO /tmp/yazi.zip "https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip"
-    unzip -q /tmp/yazi.zip -d /tmp/
-    mv /tmp/yazi-*/yazi /usr/local/bin/yazi
+    unzip -qo /tmp/yazi.zip -d /tmp/
+    mv /tmp/yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/yazi
     chmod +x /usr/local/bin/yazi
     rm -rf /tmp/yazi*
 }
@@ -412,7 +398,7 @@ _k_clean() {
     sudo DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -qq > /dev/null 2>&1
     sudo DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq > /dev/null 2>&1
     sudo apt-get autoclean -qq > /dev/null 2>&1
-    echo -e "\033[1;32m✨ Kelmora Cloud: OS Refreshed, Updated, and Optimized!\033[0m"
+    echo -e "\033[1;32m✨ Kelmora Cloud: OS Refreshed, Updated, and Optimized.\033[0m"
 }
 
 _k_swap() {
@@ -425,14 +411,14 @@ _k_swap() {
         sudo mkswap /swapfile > /dev/null 2>&1
         sudo swapon /swapfile > /dev/null 2>&1
         echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab > /dev/null 2>&1
-        echo -e "\033[1;32m✅ Kelmora Cloud: 4GB Swap Activated!\033[0m"
+        echo -e "\033[1;32m✅ Kelmora Cloud: 4GB Swap Activated.\033[0m"
     fi
 }
 
 _k_ram_flush() {
     echo -e "\033[1;37m🧹 Flushing system RAM cache...\033[0m"
     sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null
-    echo -e "\033[1;32m✨ Memory freed successfully!\033[0m"
+    echo -e "\033[1;32m✨ Memory freed successfully.\033[0m"
 }
 
 _k_audit() {
@@ -498,7 +484,7 @@ _k_install_netdata() {
 _k_extract() {
     if [ -z "$1" ]; then echo -e "\033[1;31m⚠️  Usage: kelmora extract <archive_file>\033[0m"; return 1; fi
     if [[ $1 == *.tar.gz || $1 == *.tgz ]]; then pv "$1" | tar -xz
-    elif [[ $1 == *.zip ]]; then unzip -q "$1" && echo -e "\033[1;32m✨ Complete!\033[0m"
+    elif [[ $1 == *.zip ]]; then unzip -q "$1" && echo -e "\033[1;32m✨ Complete.\033[0m"
     else echo -e "\033[1;31m❌ Unsupported format. Use .zip or .tar.gz\033[0m"; return 1; fi
 }
 
@@ -573,7 +559,7 @@ _k_help() {
     echo -e " \033[38;2;16;150;138mkelmora logs\033[0m            - Print last 20 critical system errors"
     echo -e " \033[38;2;16;150;138mkelmora wings-logs\033[0m      - Live Pterodactyl Daemon Logs"
     echo -e "\033[38;2;16;150;138m======================================================================\033[0m"
-    echo -e "\033[1;37m💡 Pro Tip: Press \033[1;32mCtrl + R\033[1;37m at any time to use the Kelmora Fuzzy History Search!\033[0m"
+    echo -e "\033[1;37m💡 Pro Tip: Press \033[1;32mCtrl + R\033[1;37m at any time to use the Kelmora Fuzzy History Search.\033[0m"
 }
 EOF
 }
@@ -704,8 +690,8 @@ main() {
     echo -e "${KC}======================================================================${NC}"
     echo -e "\033[1;32m  ✅ KELMORA SIGNATURE OS INSTALLED SUCCESSFULLY \033[0m"
     echo -e "${KC}======================================================================${NC}"
-    echo -e "\033[1;31m⚠️  CRITICAL: Close this terminal completely and log back in to activate the Singularity Engine! \033[0m"
+    echo -e "\033[1;31m⚠️  CRITICAL: Close this terminal completely and log back in to activate the Singularity Engine. \033[0m"
 }
 
-# Execute the sandbox safely
+# Execute the sandbox synchronously 
 main "$@"
