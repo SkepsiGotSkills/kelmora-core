@@ -1,14 +1,13 @@
 #!/bin/bash
 # ==============================================================================
-# 🌌 KELMORA CLOUD OS - "THE SINGULARITY" OMNI-PROVISIONER (V2)
-# VERSION: 24.1 (TITANIUM MASTER BUILD)
-# ARCHITECTURE: x86_64 Debian/Ubuntu
+# 🌌 KELMORA CLOUD OS - "THE SINGULARITY" OMNI-PROVISIONER
+# VERSION: 25.0 (IRONCLAD MASTER BUILD)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
 # [CORE INIT] Kernel & Terminal Safeguards
 # ------------------------------------------------------------------------------
-set +H # Disable Bash history expansion to guarantee paste safety
+set +H # Disable Bash history expansion to guarantee 100% paste safety
 set +m # Mute background job control output
 
 if [[ $EUID -ne 0 ]]; then
@@ -72,13 +71,6 @@ _run_task() {
 }
 
 # ------------------------------------------------------------------------------
-# [GHOST FETCHER] Bypasses GitHub API Rate Limits perfectly
-# ------------------------------------------------------------------------------
-_get_version() {
-    curl -sI "https://github.com/$1/releases/latest" | awk -F '/' '/^([Ll]ocation:|URI:)/ {print $NF}' | tr -d '\r' | sed 's/^v//'
-}
-
-# ------------------------------------------------------------------------------
 # [MODULE 1] Pre-Flight Diagnostics
 # ------------------------------------------------------------------------------
 step_diagnostics() {
@@ -138,18 +130,19 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
-# [MODULE 4] Dependencies & Fail-Safe Nala Installation
+# [MODULE 4] Nala & Mega Dependency Library
 # ------------------------------------------------------------------------------
 step_deps() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     
-    # Install Nala gracefully (allow it to fail safely on older OS versions)
-    apt-get install -y -qq nala || true
+    # Core system tools & Python-based TUI (Ranger)
+    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat fzf ripgrep fd-find lnav nala ranger
     
-    # Core dependency fetch
-    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat ripgrep fd-find lnav
-    
+    # Prettyping (Pure Bash visual ping - impossible to fail architecture checks)
+    curl -sL https://raw.githubusercontent.com/denilsonsa/prettyping/master/prettyping -o /usr/local/bin/prettyping
+    chmod +x /usr/local/bin/prettyping
+
     # Alias batcat to bat globally
     ln -sf /usr/bin/batcat /usr/local/bin/bat || true
 }
@@ -160,49 +153,42 @@ step_ookla() {
 }
 
 # ------------------------------------------------------------------------------
-# [MODULE 5] Rust Ecosystem (TUI Applications) - BULLETPROOF
+# [MODULE 5] Rust Ecosystem (TUI Applications)
 # ------------------------------------------------------------------------------
+_scrape_gh() {
+    local repo="$1"
+    local ext="$2"
+    local bin_name="$3"
+    local target_url=$(curl -sL "https://github.com/${repo}/releases/latest" | grep -o 'href=".*"' | grep "download/" | grep "${ext}" | head -n 1 | cut -d '"' -f 2)
+    if [[ -n "$target_url" ]]; then
+        wget -qO "/tmp/${bin_name}_archive" "https://github.com${target_url}"
+    fi
+}
+
 step_rust_binaries() {
-    
     # Eza (Graphical ls)
-    wget -qO /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz"
-    tar -xzf /tmp/eza.tar.gz -C /tmp/ && find /tmp/ -type f -name "eza" -exec mv {} /usr/local/bin/eza \; && chmod +x /usr/local/bin/eza
+    _scrape_gh "eza-community/eza" "x86_64-unknown-linux-gnu.tar.gz" "eza"
+    mkdir -p /tmp/eza_tmp && tar -xzf /tmp/eza_archive -C /tmp/eza_tmp && find /tmp/eza_tmp -type f -name "eza" -exec mv {} /usr/local/bin/eza \; && chmod +x /usr/local/bin/eza
     
     # Bottom (Graphical htop)
-    wget -qO /tmp/btm.tar.gz "https://github.com/ClementTsang/bottom/releases/latest/download/bottom_x86_64-unknown-linux-gnu.tar.gz"
-    tar -xzf /tmp/btm.tar.gz -C /tmp/ && find /tmp/ -type f -name "btm" -exec mv {} /usr/local/bin/btm \; && chmod +x /usr/local/bin/btm
+    _scrape_gh "ClementTsang/bottom" "x86_64-unknown-linux-gnu.tar.gz" "btm"
+    mkdir -p /tmp/btm_tmp && tar -xzf /tmp/btm_archive -C /tmp/btm_tmp && find /tmp/btm_tmp -type f -name "btm" -exec mv {} /usr/local/bin/btm \; && chmod +x /usr/local/bin/btm
     
     # Zellij (Workspace)
-    wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz"
-    tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin zellij && chmod +x /usr/local/bin/zellij
-    
-    # Gping (Visual Ping)
-    wget -qO /tmp/gping.tar.gz "https://github.com/orf/gping/releases/latest/download/gping-x86_64-unknown-linux-musl.tar.gz"
-    tar -xzf /tmp/gping.tar.gz -C /usr/local/bin gping && chmod +x /usr/local/bin/gping
+    _scrape_gh "zellij-org/zellij" "x86_64-unknown-linux-musl.tar.gz" "zellij"
+    mkdir -p /tmp/zellij_tmp && tar -xzf /tmp/zellij_archive -C /tmp/zellij_tmp && find /tmp/zellij_tmp -type f -name "zellij" -exec mv {} /usr/local/bin/zellij \; && chmod +x /usr/local/bin/zellij
     
     # Procs (Visual Process Manager)
-    PROCS_VER=$(_get_version "dalance/procs")
-    wget -qO /tmp/procs.zip "https://github.com/dalance/procs/releases/latest/download/procs-v${PROCS_VER}-x86_64-linux.zip"
-    unzip -qo /tmp/procs.zip -d /tmp/ && find /tmp/ -type f -name "procs" -exec mv {} /usr/local/bin/procs \; && chmod +x /usr/local/bin/procs
+    _scrape_gh "dalance/procs" "x86_64-linux.zip" "procs"
+    mkdir -p /tmp/procs_tmp && unzip -qo /tmp/procs_archive -d /tmp/procs_tmp && find /tmp/procs_tmp -type f -name "procs" -exec mv {} /usr/local/bin/procs \; && chmod +x /usr/local/bin/procs
 
     # Lazygit (Git UI)
-    LG_VER=$(_get_version "jesseduffield/lazygit")
-    wget -qO /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LG_VER}_Linux_x86_64.tar.gz"
-    tar -xzf /tmp/lazygit.tar.gz -C /usr/local/bin lazygit && chmod +x /usr/local/bin/lazygit
-
-    # Yazi (File Explorer)
-    wget -qO /tmp/yazi.zip "https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip"
-    unzip -qo /tmp/yazi.zip -d /tmp/
-    find /tmp/ -type f -name "yazi" -exec mv {} /usr/local/bin/yazi \; && chmod +x /usr/local/bin/yazi
-    find /tmp/ -type f -name "ya" -exec mv {} /usr/local/bin/ya \; && chmod +x /usr/local/bin/ya
-
-    # FZF (Interactive Command Menu)
-    FZF_VER=$(_get_version "junegunn/fzf")
-    wget -qO /tmp/fzf.tar.gz "https://github.com/junegunn/fzf/releases/latest/download/fzf-${FZF_VER}-linux_amd64.tar.gz"
-    tar -xzf /tmp/fzf.tar.gz -C /usr/local/bin fzf && chmod +x /usr/local/bin/fzf
+    _scrape_gh "jesseduffield/lazygit" "Linux_x86_64.tar.gz" "lazygit"
+    mkdir -p /tmp/lazygit_tmp && tar -xzf /tmp/lazygit_archive -C /tmp/lazygit_tmp && find /tmp/lazygit_tmp -type f -name "lazygit" -exec mv {} /usr/local/bin/lazygit \; && chmod +x /usr/local/bin/lazygit
 
     # Tealdeer (TLDR)
-    wget -qO /usr/local/bin/tldr "https://github.com/dbrgn/tealdeer/releases/latest/download/tldr-linux-x86_64-musl" && chmod +x /usr/local/bin/tldr
+    _scrape_gh "dbrgn/tealdeer" "linux-x86_64-musl" "tldr"
+    mv /tmp/tldr_archive /usr/local/bin/tldr && chmod +x /usr/local/bin/tldr
     
     # Micro, Zoxide, Lazydocker
     curl -sL https://getmic.ro | bash && mv micro /usr/local/bin/
@@ -210,15 +196,17 @@ step_rust_binaries() {
     curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
     
     # Cleanup
-    rm -rf /tmp/*.tar.gz /tmp/*.zip
+    rm -rf /tmp/*_tmp /tmp/*_archive
 }
 
 # ------------------------------------------------------------------------------
 # [MODULE 6] Kelmora Theming (Fastfetch & Starship)
 # ------------------------------------------------------------------------------
 step_fastfetch() {
-    wget -qO /tmp/fastfetch.tar.gz "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.tar.gz"
-    tar -xzf /tmp/fastfetch.tar.gz -C /tmp/ && find /tmp/ -type f -name "fastfetch" -exec mv {} /usr/local/bin/fastfetch \; && chmod +x /usr/local/bin/fastfetch
+    _scrape_gh "fastfetch-cli/fastfetch" "linux-amd64.tar.gz" "fastfetch"
+    mkdir -p /tmp/ff_tmp && tar -xzf /tmp/fastfetch_archive -C /tmp/ff_tmp
+    find /tmp/ff_tmp -type f -name "fastfetch" -exec mv {} /usr/local/bin/fastfetch \;
+    chmod +x /usr/local/bin/fastfetch
     
     sudo tee /etc/kelmora_logo.txt > /dev/null << 'EOF'
     //\       K E L M O R A
@@ -278,7 +266,6 @@ EOF
 }
 
 step_tui_configs() {
-    # Global Zellij Layout
     mkdir -p /etc/kelmora_configs
     sudo tee /etc/kelmora_configs/zellij.kdl > /dev/null << 'EOF'
 theme "kelmora"
@@ -300,7 +287,6 @@ themes {
 }
 EOF
 
-    # Global Micro IDE settings
     sudo tee /etc/nanorc > /dev/null << 'EOF'
 set linenumbers
 set mouse
@@ -327,52 +313,42 @@ export KELMORA_VER="SINGULARITY"
 export STARSHIP_CONFIG=/etc/starship.toml
 export BAT_THEME="TwoDark"
 
-# Force all system editors to use modern IDE
 export EDITOR="micro"
 export VISUAL="micro"
-
-# Bat-powered colored man pages
 export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 
 # FZF Kelmora Color Configuration
 export FZF_DEFAULT_OPTS="--color=fg:#ffffff,bg:-1,hl:#10968A --color=fg+:#ffffff,bg+:#10968A,hl+:#000000 --color=info:#10968A,prompt:#10968A,pointer:#10968A,marker:#10968A,spinner:#10968A,header:#10968A"
 
-# Initialize Engines
 unset PROMPT_COMMAND
 export PS1='[\u@\h \W]\$ '
 if command -v starship &> /dev/null; then eval "$(starship init bash 2>/dev/null)"; fi
 if command -v zoxide &> /dev/null; then eval "$(zoxide init bash 2>/dev/null)"; fi
 
-# Inject FZF Keybindings (Ctrl+R / Ctrl+T)
 if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
     source /usr/share/doc/fzf/examples/key-bindings.bash
 fi
 
-# Universal Aliases
 alias ls='eza --icons --color=always --group-directories-first'
 alias ll='eza -la --icons --color=always --group-directories-first'
 alias htop='btm'
 alias top='btm'
 alias cat='bat --style=plain'
 
-# Fail-Safe Nala Alias
 if command -v nala &> /dev/null; then
     alias apt='nala'
 fi
 
-# AI Concierge Hook
 command_not_found_handle() {
     echo -e "\033[1;31m[K] ❌ Kelmora Core: Command '$1' is not recognized.\033[0m"
     echo -e "\033[1;37m[K] 💡 Type '\033[38;2;16;150;138mkelmora\033[1;37m' for the interactive Command Center.\033[0m"
     return 127
 }
 
-# Visual Navigation Overrides
 cd() {
     builtin cd "$@" && echo -e "\033[38;2;16;150;138m📂 $(pwd):\033[0m" && eza --icons --color=always --group-directories-first
 }
 
-# Cinematic Loader
 _k_loader() {
     local msg="$1"
     tput civis
@@ -410,7 +386,7 @@ bench       | Execute comprehensive Hardware Benchmark
 workspace   | Launch Next-Gen Terminal Multiplexer (Zellij)
 docker-ui   | Graphical TUI Dashboard for Docker (Lazydocker)
 git         | Graphical Version Control Dashboard (Lazygit)
-files       | Next-Gen Graphical File Explorer (Yazi)
+files       | Next-Gen Graphical File Explorer (Ranger)
 logs-view   | Advanced Graphical Log Analyzer (Lnav)
 procs       | Visual Container/Process Viewer (Procs)
 find        | Telepathic File Finder with Live Preview
@@ -427,7 +403,7 @@ secure      | Activate Kelmora Shield & Fail2Ban Firewall
 net-rescue  | Emergency Firewall Wipe (If locked out)
 speedtest   | Test 10Gbps backbone (Official Ookla CLI)
 traffic     | Live visual network traffic monitor (Nethogs)
-ping        | Next-Gen Visual Ping Graph (Gping)
+ping        | Next-Gen Visual Ping Graph (Prettyping)
 trace       | Advanced Route Tracking (MTR)
 ports       | List all active listening ports
 audit       | Deep system security & vulnerability sweep
@@ -463,7 +439,6 @@ reboot      | Safely reboot the operating system node"
         "reboot") echo -e "\033[1;31mRebooting node in 3 seconds...\033[0m"; sleep 3; sudo reboot ;;
         "scan") tput civis; echo -en "\033[1;37m[SYS] Scanning Memory & Network... \033[0m"; for i in {1..10}; do echo -n "█"; sleep 0.05; done; echo -e " \033[1;32mOK\033[0m"; tput cnorm ;;
         
-        # Telepathic Tooling
         "procs") procs ;;
         "cheat") if [ -z "$1" ]; then echo "Usage: kelmora cheat <command>"; else tldr "$1"; fi ;;
         "find") 
@@ -477,26 +452,23 @@ reboot      | Safely reboot the operating system node"
             fi
             ;;
 
-        # Deployers
         "install-ptero") bash <(curl -s https://pterodactyl-installer.se) ;;
         "install-docker") curl -fsSL https://get.docker.com | bash ;;
         
-        # Network & Security
         "secure") systemctl enable fail2ban && systemctl start fail2ban && ufw default deny incoming && ufw default allow outgoing && ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable ;;
         "net-rescue") sudo iptables -F; sudo ufw disable; echo -e "\033[1;31m🚨 Network protections dropped.\033[0m" ;;
         "audit") echo -e "\033[1;32mPASS\033[0m (Basic Audit executed)" ;;
         "speedtest"|"speed") speedtest --accept-license --accept-gdpr ;;
-        "ping") gping "${1:-8.8.8.8}" ;;
+        "ping") prettyping "${1:-8.8.8.8}" ;;
         "trace") mtr 8.8.8.8 ;;
         "traffic") sudo nethogs ;;
         "ports") sudo ss -tulpn | grep LISTEN ;;
         "myip") curl -s ifconfig.me; echo "" ;;
         
-        # File & UI Modules
         "workspace") zellij --config /etc/kelmora_configs/zellij.kdl ;;
         "docker-ui") lazydocker ;;
         "git") lazygit "$@" ;;
-        "files") yazi "$@" ;;
+        "files") ranger "$@" ;;
         "logs-view") lnav "$@" ;;
         "read") bat "$@" ;;
         "ls") eza -la --icons --group-directories-first "$@" ;;
@@ -506,7 +478,6 @@ reboot      | Safely reboot the operating system node"
         "extract") tar -xzf "$1" ;;
         "nuke") echo -e "\033[1;31m🧨 NUKING $1\033[0m"; rm -rf "$1" ;;
         
-        # Pterodactyl Integrations
         "docker-ps") docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" ;;
         "wings-logs") sudo journalctl -u wings -n 50 -f ;;
         "wings-rest") sudo systemctl restart wings; echo -e "\033[1;32m🦖 Wings restarted.\033[0m" ;;
@@ -528,7 +499,7 @@ _k_help() {
     echo -e " \033[38;2;16;150;138mkelmora os\033[0m              - Next-Gen System Identity Readout (Fastfetch)"
     echo -e " \033[38;2;16;150;138mkelmora info\033[0m            - Print CPU, Kernel, and Arch details"
     echo -e " \033[38;2;16;150;138mkelmora services\033[0m        - Scan & View Local App Health Matrix"
-    echo -e " \033[38;2;16;150;138mkelmora optimizer\033[0m       - Animated OS Update & Deep Junk Purge"
+    echo -e " \033[38;2;16;150;138mkelmora optimizer\033[0m       - Animated OS Update & Deep Junk Purge (Nala)"
     echo -e " \033[38;2;16;150;138mkelmora scan\033[0m            - Animated deep system diagnostics"
     echo -e " \033[38;2;16;150;138mkelmora 4gb-ram\033[0m         - Instantly allocate 4GB Emergency Swap Memory"
     echo -e " \033[38;2;16;150;138mkelmora ram-flush\033[0m       - Instantly free up cached system memory"
@@ -545,7 +516,7 @@ _k_help() {
     echo -e "\033[1;37m[🛡️  NETWORK & SECURITY]\033[0m"
     echo -e " \033[38;2;16;150;138mkelmora secure\033[0m          - Activate Kelmora Shield & Fail2Ban Firewall"
     echo -e " \033[38;2;16;150;138mkelmora speedtest\033[0m       - Test 10Gbps backbone (Official Ookla CLI)"
-    echo -e " \033[38;2;16;150;138mkelmora ping <ip>\033[0m       - Next-Gen Visual Ping Graph (gping)"
+    echo -e " \033[38;2;16;150;138mkelmora ping <ip>\033[0m       - Next-Gen Visual Ping Graph (prettyping)"
     echo -e " \033[38;2;16;150;138mkelmora traffic\033[0m         - Live visual network traffic monitor (nethogs)"
     echo -e " \033[38;2;16;150;138mkelmora trace\033[0m           - Advanced Route Tracking (mtr)"
     echo -e " \033[38;2;16;150;138mkelmora ports\033[0m           - List all active listening ports"
@@ -556,7 +527,7 @@ _k_help() {
     echo -e " \033[38;2;16;150;138mkelmora workspace\033[0m       - Launch Next-Gen Terminal Multiplexer (Zellij)"
     echo -e " \033[38;2;16;150;138mkelmora docker-ui\033[0m       - Graphical TUI Dashboard for Docker (Lazydocker)"
     echo -e " \033[38;2;16;150;138mkelmora git\033[0m             - Graphical Version Control Dashboard (Lazygit)"
-    echo -e " \033[38;2;16;150;138mkelmora files\033[0m           - Next-Gen Graphical File Explorer (Yazi)"
+    echo -e " \033[38;2;16;150;138mkelmora files\033[0m           - Next-Gen Graphical File Explorer (Ranger)"
     echo -e " \033[38;2;16;150;138mkelmora logs-view <log>\033[0m - Advanced Graphical Log Analyzer (Lnav)"
     echo -e " \033[38;2;16;150;138mkelmora find\033[0m            - Telepathic File Finder with Live Preview"
     echo -e " \033[38;2;16;150;138mkelmora search <text>\033[0m   - Deep Content Search Engine (Ripgrep)"
@@ -637,13 +608,13 @@ step_silence_ads() {
 # ============================================================
 
 main() {
-    _run_task "Performing Diagnostics & Disk Integrity..." step_diagnostics
+    _run_task "Performing Diagnostics & Disk Integrity..." step_hw_check
     _run_task "Injecting Kernel Speed Optimizations (TCP BBR)..." step_kernel_optim
     _run_task "Purging Ghost Configurations..." step_scrub
-    _run_task "Fetching Kelmora Mega-Dependency Library..." step_deps
+    _run_task "Fetching Kelmora Mega-Dependency Library (Nala, Ranger, Lnav)..." step_deps
     _run_task "Hooking into Ookla Enterprise Repositories..." step_ookla
-    _run_task "Forging TUI Workspaces (Zellij, Lazygit, Yazi, FZF)..." step_rust_binaries
-    _run_task "Deploying Custom OS Identity Engine (Fastfetch)..." step_fastfetch
+    _run_task "Forging TUI Workspaces (Zellij, Lazygit, FZF, Micro)..." step_rust_binaries
+    _run_task "Deploying OS Identity Engine (Fastfetch)..." step_fastfetch
     _run_task "Forging Starship Rust-Engine Prompt..." step_starship
     _run_task "Deploying Custom TUI Color Themes..." step_tui_configs
     _run_task "Injecting Kelmora Interactive Command Center..." step_cli_engine
