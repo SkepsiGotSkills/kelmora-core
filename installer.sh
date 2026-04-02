@@ -1,14 +1,14 @@
 #!/bin/bash
 # ==============================================================================
-# 🌌 KELMORA CLOUD OS - "THE SINGULARITY" OMNI-PROVISIONER
-# VERSION: 24.0 (TITANIUM MASTER BUILD)
+# 🌌 KELMORA CLOUD OS - "THE SINGULARITY" OMNI-PROVISIONER (V2)
+# VERSION: 24.1 (TITANIUM MASTER BUILD)
 # ARCHITECTURE: x86_64 Debian/Ubuntu
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
 # [CORE INIT] Kernel & Terminal Safeguards
 # ------------------------------------------------------------------------------
-set +H # Disable Bash history expansion to guarantee 100% paste safety
+set +H # Disable Bash history expansion to guarantee paste safety
 set +m # Mute background job control output
 
 if [[ $EUID -ne 0 ]]; then
@@ -72,14 +72,18 @@ _run_task() {
 }
 
 # ------------------------------------------------------------------------------
+# [GHOST FETCHER] Bypasses GitHub API Rate Limits perfectly
+# ------------------------------------------------------------------------------
+_get_version() {
+    curl -sI "https://github.com/$1/releases/latest" | awk -F '/' '/^([Ll]ocation:|URI:)/ {print $NF}' | tr -d '\r' | sed 's/^v//'
+}
+
+# ------------------------------------------------------------------------------
 # [MODULE 1] Pre-Flight Diagnostics
 # ------------------------------------------------------------------------------
 step_diagnostics() {
-    # 1. Architecture Check
     if [[ $(uname -m) != "x86_64" ]]; then exit 1; fi
-    # 2. Network Check
     ping -c 1 8.8.8.8 || exit 1
-    # 3. Disk R/W Check
     mount -o remount,rw / || exit 1
     touch /etc/kelmora_hw_test || exit 1
     rm -f /etc/kelmora_hw_test
@@ -134,17 +138,17 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
-# [MODULE 4] Nala & Mega Dependency Library
+# [MODULE 4] Dependencies & Fail-Safe Nala Installation
 # ------------------------------------------------------------------------------
 step_deps() {
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     
-    # 1. Install Nala (The beautiful APT replacement)
-    apt-get install -y -qq nala
+    # Install Nala gracefully (allow it to fail safely on older OS versions)
+    apt-get install -y -qq nala || true
     
-    # 2. Use Nala's parallel engine for the massive library fetch
-    nala install -y curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat fzf ripgrep fd-find lnav
+    # Core dependency fetch
+    apt-get install -y -qq curl apt-transport-https ca-certificates gnupg bc htop unzip wget tar ufw git jq net-tools pv cmatrix mtr-tiny dnsutils software-properties-common fail2ban iperf3 nethogs ncdu bat ripgrep fd-find lnav
     
     # Alias batcat to bat globally
     ln -sf /usr/bin/batcat /usr/local/bin/bat || true
@@ -152,58 +156,53 @@ step_deps() {
 
 step_ookla() {
     curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
-    nala install -y speedtest
+    apt-get install -y -qq speedtest
 }
 
 # ------------------------------------------------------------------------------
-# [MODULE 5] Rust Ecosystem (TUI Applications)
+# [MODULE 5] Rust Ecosystem (TUI Applications) - BULLETPROOF
 # ------------------------------------------------------------------------------
-# Helper: Advanced GitHub Binary Scraper (Bypasses API limits and name changes)
-_scrape_gh() {
-    local repo="$1"
-    local ext="$2"
-    local bin_name="$3"
-    # Find the actual download URL from the latest release page HTML
-    local target_url=$(curl -sL "https://github.com/${repo}/releases/latest" | grep -o 'href=".*"' | grep "download/" | grep "${ext}" | head -n 1 | cut -d '"' -f 2)
-    if [[ -n "$target_url" ]]; then
-        wget -qO "/tmp/${bin_name}_archive" "https://github.com${target_url}"
-    fi
-}
-
 step_rust_binaries() {
+    
     # Eza (Graphical ls)
-    _scrape_gh "eza-community/eza" "x86_64-unknown-linux-gnu.tar.gz" "eza"
-    mkdir -p /tmp/eza_tmp && tar -xzf /tmp/eza_archive -C /tmp/eza_tmp && find /tmp/eza_tmp -type f -name "eza" -exec mv {} /usr/local/bin/eza \; && chmod +x /usr/local/bin/eza
+    wget -qO /tmp/eza.tar.gz "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz"
+    tar -xzf /tmp/eza.tar.gz -C /tmp/ && find /tmp/ -type f -name "eza" -exec mv {} /usr/local/bin/eza \; && chmod +x /usr/local/bin/eza
     
     # Bottom (Graphical htop)
-    _scrape_gh "ClementTsang/bottom" "x86_64-unknown-linux-gnu.tar.gz" "btm"
-    mkdir -p /tmp/btm_tmp && tar -xzf /tmp/btm_archive -C /tmp/btm_tmp && find /tmp/btm_tmp -type f -name "btm" -exec mv {} /usr/local/bin/btm \; && chmod +x /usr/local/bin/btm
+    wget -qO /tmp/btm.tar.gz "https://github.com/ClementTsang/bottom/releases/latest/download/bottom_x86_64-unknown-linux-gnu.tar.gz"
+    tar -xzf /tmp/btm.tar.gz -C /tmp/ && find /tmp/ -type f -name "btm" -exec mv {} /usr/local/bin/btm \; && chmod +x /usr/local/bin/btm
     
     # Zellij (Workspace)
-    _scrape_gh "zellij-org/zellij" "x86_64-unknown-linux-musl.tar.gz" "zellij"
-    mkdir -p /tmp/zellij_tmp && tar -xzf /tmp/zellij_archive -C /tmp/zellij_tmp && find /tmp/zellij_tmp -type f -name "zellij" -exec mv {} /usr/local/bin/zellij \; && chmod +x /usr/local/bin/zellij
+    wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz"
+    tar -xzf /tmp/zellij.tar.gz -C /usr/local/bin zellij && chmod +x /usr/local/bin/zellij
     
     # Gping (Visual Ping)
-    _scrape_gh "orf/gping" "x86_64-unknown-linux-musl.tar.gz\|Linux-x86_64.tar.gz" "gping"
-    mkdir -p /tmp/gping_tmp && tar -xzf /tmp/gping_archive -C /tmp/gping_tmp && find /tmp/gping_tmp -type f -name "gping" -exec mv {} /usr/local/bin/gping \; && chmod +x /usr/local/bin/gping
+    wget -qO /tmp/gping.tar.gz "https://github.com/orf/gping/releases/latest/download/gping-x86_64-unknown-linux-musl.tar.gz"
+    tar -xzf /tmp/gping.tar.gz -C /usr/local/bin gping && chmod +x /usr/local/bin/gping
     
     # Procs (Visual Process Manager)
-    _scrape_gh "dalance/procs" "x86_64-linux.zip" "procs"
-    mkdir -p /tmp/procs_tmp && unzip -qo /tmp/procs_archive -d /tmp/procs_tmp && find /tmp/procs_tmp -type f -name "procs" -exec mv {} /usr/local/bin/procs \; && chmod +x /usr/local/bin/procs
+    PROCS_VER=$(_get_version "dalance/procs")
+    wget -qO /tmp/procs.zip "https://github.com/dalance/procs/releases/latest/download/procs-v${PROCS_VER}-x86_64-linux.zip"
+    unzip -qo /tmp/procs.zip -d /tmp/ && find /tmp/ -type f -name "procs" -exec mv {} /usr/local/bin/procs \; && chmod +x /usr/local/bin/procs
 
     # Lazygit (Git UI)
-    _scrape_gh "jesseduffield/lazygit" "Linux_x86_64.tar.gz" "lazygit"
-    mkdir -p /tmp/lazygit_tmp && tar -xzf /tmp/lazygit_archive -C /tmp/lazygit_tmp && find /tmp/lazygit_tmp -type f -name "lazygit" -exec mv {} /usr/local/bin/lazygit \; && chmod +x /usr/local/bin/lazygit
+    LG_VER=$(_get_version "jesseduffield/lazygit")
+    wget -qO /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LG_VER}_Linux_x86_64.tar.gz"
+    tar -xzf /tmp/lazygit.tar.gz -C /usr/local/bin lazygit && chmod +x /usr/local/bin/lazygit
 
     # Yazi (File Explorer)
-    _scrape_gh "sxyazi/yazi" "x86_64-unknown-linux-gnu.zip" "yazi"
-    mkdir -p /tmp/yazi_tmp && unzip -qo /tmp/yazi_archive -d /tmp/yazi_tmp
-    find /tmp/yazi_tmp -type f -name "yazi" -exec mv {} /usr/local/bin/yazi \; && chmod +x /usr/local/bin/yazi
-    find /tmp/yazi_tmp -type f -name "ya" -exec mv {} /usr/local/bin/ya \; && chmod +x /usr/local/bin/ya
+    wget -qO /tmp/yazi.zip "https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip"
+    unzip -qo /tmp/yazi.zip -d /tmp/
+    find /tmp/ -type f -name "yazi" -exec mv {} /usr/local/bin/yazi \; && chmod +x /usr/local/bin/yazi
+    find /tmp/ -type f -name "ya" -exec mv {} /usr/local/bin/ya \; && chmod +x /usr/local/bin/ya
+
+    # FZF (Interactive Command Menu)
+    FZF_VER=$(_get_version "junegunn/fzf")
+    wget -qO /tmp/fzf.tar.gz "https://github.com/junegunn/fzf/releases/latest/download/fzf-${FZF_VER}-linux_amd64.tar.gz"
+    tar -xzf /tmp/fzf.tar.gz -C /usr/local/bin fzf && chmod +x /usr/local/bin/fzf
 
     # Tealdeer (TLDR)
-    _scrape_gh "dbrgn/tealdeer" "linux-x86_64-musl" "tldr"
-    mv /tmp/tldr_archive /usr/local/bin/tldr && chmod +x /usr/local/bin/tldr
+    wget -qO /usr/local/bin/tldr "https://github.com/dbrgn/tealdeer/releases/latest/download/tldr-linux-x86_64-musl" && chmod +x /usr/local/bin/tldr
     
     # Micro, Zoxide, Lazydocker
     curl -sL https://getmic.ro | bash && mv micro /usr/local/bin/
@@ -211,17 +210,15 @@ step_rust_binaries() {
     curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
     
     # Cleanup
-    rm -rf /tmp/*_tmp /tmp/*_archive
+    rm -rf /tmp/*.tar.gz /tmp/*.zip
 }
 
 # ------------------------------------------------------------------------------
 # [MODULE 6] Kelmora Theming (Fastfetch & Starship)
 # ------------------------------------------------------------------------------
 step_fastfetch() {
-    _scrape_gh "fastfetch-cli/fastfetch" "linux-amd64.tar.gz" "fastfetch"
-    mkdir -p /tmp/ff_tmp && tar -xzf /tmp/fastfetch_archive -C /tmp/ff_tmp
-    find /tmp/ff_tmp -type f -name "fastfetch" -exec mv {} /usr/local/bin/fastfetch \;
-    chmod +x /usr/local/bin/fastfetch
+    wget -qO /tmp/fastfetch.tar.gz "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.tar.gz"
+    tar -xzf /tmp/fastfetch.tar.gz -C /tmp/ && find /tmp/ -type f -name "fastfetch" -exec mv {} /usr/local/bin/fastfetch \; && chmod +x /usr/local/bin/fastfetch
     
     sudo tee /etc/kelmora_logo.txt > /dev/null << 'EOF'
     //\       K E L M O R A
@@ -357,7 +354,11 @@ alias ll='eza -la --icons --color=always --group-directories-first'
 alias htop='btm'
 alias top='btm'
 alias cat='bat --style=plain'
-alias apt='nala'
+
+# Fail-Safe Nala Alias
+if command -v nala &> /dev/null; then
+    alias apt='nala'
+fi
 
 # AI Concierge Hook
 command_not_found_handle() {
@@ -452,7 +453,7 @@ reboot      | Safely reboot the operating system node"
         "os") fastfetch -c /etc/fastfetch-kelmora.jsonc ;;
         "info") echo -e "\033[38;2;16;150;138m⚙️  Hardware Identity:\033[0m\n   CPU: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)\n   Kernel: $(uname -r)" ;;
         "services") local found=false; for s in docker nginx wings ufw ssh; do if systemctl list-unit-files | grep -q "^${s}.service"; then found=true; echo -en "   Checking $s... "; systemctl is-active --quiet $s && echo -e "\033[1;32m🟢 ONLINE\033[0m" || echo -e "\033[1;31m🔴 OFFLINE\033[0m"; fi; done; [[ "$found" == false ]] && echo "No tracked services found.";;
-        "updater"|"optimizer"|"clean") nala update && nala upgrade -y && nala autoremove -y ;;
+        "updater"|"optimizer"|"clean") if command -v nala &> /dev/null; then nala update && nala upgrade -y && nala autoremove -y; else apt-get update && apt-get upgrade -y && apt-get autoremove -y; fi ;;
         "ram-flush") sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null; echo -e "\033[1;32m✨ Memory freed successfully.\033[0m" ;;
         "swap"|"4gb-ram") if [ -f /swapfile ]; then echo "Swap exists."; else fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo "/swapfile none swap sw 0 0" >> /etc/fstab; fi ;;
         "stats") btm ;;
@@ -527,7 +528,7 @@ _k_help() {
     echo -e " \033[38;2;16;150;138mkelmora os\033[0m              - Next-Gen System Identity Readout (Fastfetch)"
     echo -e " \033[38;2;16;150;138mkelmora info\033[0m            - Print CPU, Kernel, and Arch details"
     echo -e " \033[38;2;16;150;138mkelmora services\033[0m        - Scan & View Local App Health Matrix"
-    echo -e " \033[38;2;16;150;138mkelmora optimizer\033[0m       - Animated OS Update & Deep Junk Purge (Nala)"
+    echo -e " \033[38;2;16;150;138mkelmora optimizer\033[0m       - Animated OS Update & Deep Junk Purge"
     echo -e " \033[38;2;16;150;138mkelmora scan\033[0m            - Animated deep system diagnostics"
     echo -e " \033[38;2;16;150;138mkelmora 4gb-ram\033[0m         - Instantly allocate 4GB Emergency Swap Memory"
     echo -e " \033[38;2;16;150;138mkelmora ram-flush\033[0m       - Instantly free up cached system memory"
@@ -636,23 +637,23 @@ step_silence_ads() {
 # ============================================================
 
 main() {
-    _run_task "Performing deep disk integrity check..." step_hw_check
+    _run_task "Performing Diagnostics & Disk Integrity..." step_diagnostics
     _run_task "Injecting Kernel Speed Optimizations (TCP BBR)..." step_kernel_optim
-    _run_task "Purging ghost configurations..." step_scrub
-    _run_task "Fetching Massive Dependency Library (Nala, Lnav, FZF)..." step_deps
-    _run_task "Hooking into Ookla Speedtest repositories..." step_ookla
-    _run_task "Forging TUI Workspaces (Zellij, Lazygit, Yazi, Gping)..." step_rust_binaries
+    _run_task "Purging Ghost Configurations..." step_scrub
+    _run_task "Fetching Kelmora Mega-Dependency Library..." step_deps
+    _run_task "Hooking into Ookla Enterprise Repositories..." step_ookla
+    _run_task "Forging TUI Workspaces (Zellij, Lazygit, Yazi, FZF)..." step_rust_binaries
     _run_task "Deploying Custom OS Identity Engine (Fastfetch)..." step_fastfetch
-    _run_task "Deploying Custom TUI Color Themes..." step_tui_configs
     _run_task "Forging Starship Rust-Engine Prompt..." step_starship
+    _run_task "Deploying Custom TUI Color Themes..." step_tui_configs
     _run_task "Injecting Kelmora Interactive Command Center..." step_cli_engine
     _run_task "Compiling Signature Heartbeat Dashboard..." step_motd
     _run_task "Wiring the Neural Boot sequence..." step_boot_anim
     _run_task "Eradicating Ubuntu Ads & Enforcing Persistence..." step_silence_ads
     
     systemctl restart ssh > /dev/null 2>&1
-    tput cnorm 
     
+    tput cnorm 
     echo ""
     echo -e "${KC}======================================================================${NC}"
     echo -e "\033[1;32m  ✅ KELMORA SIGNATURE OS INSTALLED SUCCESSFULLY \033[0m"
