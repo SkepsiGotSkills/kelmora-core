@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # 🌌 KELMORA CLOUD OS - "THE SINGULARITY" OMNI-PROVISIONER
-# VERSION: 25.0 (TITANIUM MASTER BUILD)
+# VERSION: 25.0 (IRONCLAD MASTER BUILD)
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -131,7 +131,7 @@ step_deps() {
     # Alias batcat to bat globally
     ln -sf /usr/bin/batcat /usr/local/bin/bat || true
     
-    # Fetch pure bash Prettyping
+    # Fetch pure bash Prettyping (Bomb-proof architecture check)
     curl -sL https://raw.githubusercontent.com/denilsonsa/prettyping/master/prettyping -o /usr/local/bin/prettyping
     chmod +x /usr/local/bin/prettyping
 }
@@ -166,11 +166,15 @@ step_rust_binaries() {
     _scrape_gh "jesseduffield/lazygit" "Linux_x86_64.tar.gz" "lazygit"
     mkdir -p /tmp/lazygit_tmp && tar -xzf /tmp/lazygit_archive -C /tmp/lazygit_tmp && find /tmp/lazygit_tmp -type f -name "lazygit" -exec mv {} /usr/local/bin/lazygit \; && chmod +x /usr/local/bin/lazygit
 
-    # 7. Tealdeer (Rust TLDR)
+    # 7. Duf (Visual Disk Usage)
+    _scrape_gh "muesli/duf" "linux_x86_64.tar.gz" "duf"
+    mkdir -p /tmp/duf_tmp && tar -xzf /tmp/duf_archive -C /tmp/duf_tmp && find /tmp/duf_tmp -type f -name "duf" -exec mv {} /usr/local/bin/duf \; && chmod +x /usr/local/bin/duf
+
+    # 8. Tealdeer (Rust TLDR)
     _scrape_gh "dbrgn/tealdeer" "linux-x86_64-musl" "tldr"
     mv /tmp/tldr_archive /usr/local/bin/tldr && chmod +x /usr/local/bin/tldr
 
-    # 8. Micro, Zoxide, Lazydocker
+    # 9. Micro, Zoxide, Lazydocker
     curl -sL https://getmic.ro | bash && mv micro /usr/local/bin/
     curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash && mv ~/.local/bin/zoxide /usr/local/bin/ || true
     curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | DIR=/usr/local/bin bash
@@ -276,7 +280,7 @@ EOF
 }
 
 # ============================================================
-# 🧠 STAGE 4: THE UNIFIED COMMAND ENGINE (USER MERGE)
+# 🧠 STAGE 4: THE UNIFIED COMMAND ENGINE
 # ============================================================
 
 step_cli_engine() {
@@ -292,6 +296,7 @@ export STARSHIP_CONFIG=/etc/starship.toml
 export BAT_THEME="TwoDark"
 export EDITOR="micro"
 export VISUAL="micro"
+export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 
 # --- FZF Kelmora Color Configuration ---
 export FZF_DEFAULT_OPTS="--color=fg:#ffffff,bg:-1,hl:#10968A --color=fg+:#ffffff,bg+:#10968A,hl+:#000000 --color=info:#10968A,prompt:#10968A,pointer:#10968A,marker:#10968A,spinner:#10968A,header:#10968A"
@@ -301,6 +306,11 @@ unset PROMPT_COMMAND
 export PS1='[\u@\h \W]\$ '
 if command -v starship &> /dev/null; then eval "$(starship init bash 2>/dev/null)"; fi
 if command -v zoxide &> /dev/null; then eval "$(zoxide init bash 2>/dev/null)"; fi
+
+# Inject FZF Keybindings (Ctrl+R / Ctrl+T)
+if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
+    source /usr/share/doc/fzf/examples/key-bindings.bash
+fi
 
 # --- Universal Aliases for Quantum Tools ---
 alias ls='eza --icons --color=always --group-directories-first'
@@ -386,6 +396,9 @@ docker-ui     | Graphical TUI Dashboard for Docker (Lazydocker)
 git           | Graphical Version Control Dashboard (Lazygit)
 files         | Next-Gen Graphical File Explorer (Ranger)
 logs-view     | Advanced Graphical Log Analyzer (Lnav)
+find          | Telepathic File Finder with Live Preview
+search        | Deep Content Search Engine (Ripgrep)
+cheat         | Instant Command Examples (Tealdeer)
 edit          | Next-Gen IDE File Editor with Mouse (Micro)
 read          | Syntax-highlighted file reader (Bat)
 ls            | Graphical directory list with icons (Eza)
@@ -408,7 +421,7 @@ wings-rest    | Instantly reboot the Wings service
 help          | Display the full static Command Matrix
 reboot        | Safely reboot the operating system node"
 
-        local selection=$(echo "$choices" | column -s '|' -t | fzf --height 60% --layout=reverse --border --prompt="Kelmora Center ❯ " --header="[ Arrow Keys to Navigate • Enter to Execute ]" 2>/dev/null)
+        local selection=$(echo "$choices" | column -s '|' -t | fzf --height 80% --layout=reverse --border --prompt="Kelmora Center ❯ " --header="[ Arrow Keys to Navigate • Enter to Execute ]" 2>/dev/null)
         local parsed_cmd=$(echo "$selection" | awk '{print $1}')
         
         if [[ -n "$parsed_cmd" ]]; then kelmora "$parsed_cmd" "$@"; fi
@@ -416,7 +429,7 @@ reboot        | Safely reboot the operating system node"
     fi
 
     # 2. Cinematic Loader for execution
-    [[ "$cmd" =~ ^(help|os|scan|stats|read|ls|workspace|docker-ui|git|files|logs-view|disk|procs)$ ]] || _k_loader "[Kelmora OS] Engaging module: $cmd"
+    [[ "$cmd" =~ ^(help|os|scan|stats|read|ls|workspace|docker-ui|git|files|logs-view|disk|procs|find|search|cheat)$ ]] || _k_loader "[Kelmora OS] Engaging module: $cmd"
 
     # 3. The Execution Switch
     case "$cmd" in
@@ -434,7 +447,18 @@ reboot        | Safely reboot the operating system node"
         "reboot") echo -e "\033[1;31mRebooting node in 3 seconds...\033[0m"; sleep 3; sudo reboot ;;
         "scan") tput civis; echo -en "\033[1;37m[SYS] Scanning Memory & Network... \033[0m"; for i in {1..10}; do echo -n "█"; sleep 0.05; done; echo -e " \033[1;32mOK\033[0m"; tput cnorm ;;
         
-        # --- One-Click Installers ---
+        "find") 
+            local file=$(fzf --preview 'bat --style=numbers --color=always {}')
+            [[ -n "$file" ]] && micro "$file"
+            ;;
+        "search")
+            if [ -z "$1" ]; then echo "Usage: kelmora search <text>"; else
+                local file=$(rg --files-with-matches --no-messages "$1" | fzf --preview "rg --ignore-case --pretty --context 10 '$1' {}")
+                [[ -n "$file" ]] && micro "$file"
+            fi
+            ;;
+        "cheat") if [ -z "$1" ]; then echo "Usage: kelmora cheat <command>"; else tldr "$1"; fi ;;
+
         "install-ptero") bash <(curl -s https://pterodactyl-installer.se) ;;
         "install-docker") curl -fsSL https://get.docker.com | bash ;;
         "install-java") 
@@ -469,7 +493,8 @@ reboot        | Safely reboot the operating system node"
         "traffic") sudo nethogs ;;
         "ports") sudo ss -tulpn | grep LISTEN ;;
         "myip") curl -s ifconfig.me; echo "" ;;
-        "workspace") zellij ;;
+        
+        "workspace") zellij --config /etc/kelmora_configs/zellij.kdl ;;
         "docker-ui") lazydocker ;;
         "git") lazygit "$@" ;;
         "files") ranger "$@" ;;
@@ -498,6 +523,7 @@ reboot        | Safely reboot the operating system node"
         "docker-ps") docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}" ;;
         "wings-logs") sudo journalctl -u wings -n 50 -f ;;
         "wings-rest") sudo systemctl restart wings; echo -e "\033[1;32m🦖 Wings restarted.\033[0m" ;;
+        
         "welcome") /usr/local/bin/k-welcome ;;
         "matrix") cmatrix -b -C cyan ;;
         "help"|"") _k_help ;;
@@ -549,6 +575,9 @@ _k_help() {
     echo -e " \033[38;2;16;150;138mkelmora git\033[0m             - Graphical Version Control Dashboard (Lazygit)"
     echo -e " \033[38;2;16;150;138mkelmora files\033[0m           - Next-Gen Graphical File Explorer (Ranger)"
     echo -e " \033[38;2;16;150;138mkelmora logs-view <log>\033[0m - Advanced Graphical Log Analyzer (Lnav)"
+    echo -e " \033[38;2;16;150;138mkelmora find\033[0m            - Telepathic File Finder with Live Preview"
+    echo -e " \033[38;2;16;150;138mkelmora search <text>\033[0m   - Deep Content Search Engine (Ripgrep)"
+    echo -e " \033[38;2;16;150;138mkelmora cheat <cmd>\033[0m     - Instant Command Examples (Tealdeer)"
     echo -e " \033[38;2;16;150;138mkelmora edit <file>\033[0m     - Next-Gen IDE File Editor with Mouse Support (Micro)"
     echo -e " \033[38;2;16;150;138mkelmora read <file>\033[0m     - Next-Gen syntax-highlighted file reader (bat)"
     echo -e " \033[38;2;16;150;138mkelmora ls\033[0m              - Graphical directory list with icons (eza)"
@@ -604,6 +633,7 @@ clear
 /etc/update-motd.d/99-kelmora-dash
 EOF
     sudo chmod +x /usr/local/bin/k-welcome
+    
     sudo tee /etc/profile.d/kelmora_welcome.sh > /dev/null << 'EOF'
 #!/bin/bash
 if [ ! -f ~/.kelmora_welcomed ]; then
@@ -656,6 +686,7 @@ main() {
     
     systemctl restart ssh > /dev/null 2>&1
     tput cnorm 
+    
     echo ""
     echo -e "${KC}======================================================================${NC}"
     echo -e "\033[1;32m  ✅ KELMORA SIGNATURE OS INSTALLED SUCCESSFULLY \033[0m"
