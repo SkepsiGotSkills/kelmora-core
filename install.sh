@@ -468,7 +468,7 @@ _onboarding_ui() {
 
     tput cnorm
     local choice
-    read -r -p "  ❯ " choice
+    read -r -p "  ❯ " choice </dev/tty
     tput civis
 
     case "${choice}" in
