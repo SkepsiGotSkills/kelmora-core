@@ -16,7 +16,25 @@ The first milestone is complete: local platform detection, a responsive terminal
 
 It intentionally does **not** run remote `curl | bash` installers, add unverified third-party repositories, change firewall rules, or provision web/database/game-panel workloads automatically. Those will become separately reviewed modules with explicit user consent.
 
-## Run
+## Quick install
+
+After publishing the first GitHub Release, the public installation command is one clean line:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SkepsiGotSkills/kelmora-core/main/install.sh | sudo bash
+```
+
+The small bootstrap downloads the complete modular installer from the latest Kelmora GitHub Release, verifies its SHA-256 checksum, and starts onboarding. It does not execute the release archive until verification succeeds.
+
+To install an exact release instead of the latest one:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SkepsiGotSkills/kelmora-core/main/install.sh | sudo bash -s -- --release v0.1.0
+```
+
+The one-line command necessarily trusts the Kelmora-hosted bootstrap it downloads. For production hardening, publish signed release manifests and eventually serve this small bootstrap from a Kelmora-controlled HTTPS domain such as `get.kelmora.cloud`.
+
+## Manual run
 
 Copy the complete `kelmora-installer` folder to the VPS and run from its root:
 
@@ -46,11 +64,29 @@ sudo bash kelmora-installer update --yes
 sudo bash kelmora-installer uninstall --yes
 ```
 
+## Publishing a GitHub Release
+
+The quick installer becomes live only after a GitHub Release contains both expected assets. From a checked-out copy of this repository:
+
+```bash
+bash scripts/package-release.sh --version v0.1.0
+```
+
+Create and publish a GitHub Release tagged `v0.1.0`, then upload these two generated files **without renaming them**:
+
+```text
+dist/kelmora-installer.tar.gz
+dist/kelmora-installer.tar.gz.sha256
+```
+
+The bootstrap downloads those exact asset names from either the latest release or a requested release tag. Do not expose the quick-install command until the release is published.
+
 ## Project layout
 
 ```text
 kelmora-installer/
 ├── kelmora-installer     Entry point and command routing
+├── install.sh             Public checksum-verifying bootstrap
 ├── lib/
 │   ├── common.sh          Runtime safety, logging, and options
 │   ├── ui.sh              Adaptive terminal visual system and prompts
@@ -58,6 +94,8 @@ kelmora-installer/
 │   ├── plan.sh            Profiles and explicit installation plan
 │   ├── onboarding.sh      Guided first-run state machine
 │   └── install.sh         Transactional deploy, update, and uninstall
+├── scripts/
+│   └── package-release.sh  Builds GitHub Release assets and checksum
 └── tests/
     └── test-platform.sh   Portable unit tests for support policy
 ```
