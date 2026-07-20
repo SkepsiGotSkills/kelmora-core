@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kelmora Bootstrap Installer
-# Downloads the latest installer directly from GitHub.
+# Downloads the latest Kelmora repository from GitHub and starts the installer.
 
 set -Eeuo pipefail
 IFS=$'\n\t'
@@ -58,37 +58,34 @@ EOF
 
 main() {
 
-    [[ ${EUID} -eq 0 ]] || die "Run using sudo."
+    [[ $EUID -eq 0 ]] || die "Run using sudo."
 
-    command -v bash >/dev/null || die "bash is required."
+    command -v tar >/dev/null || die "tar is required."
+    command -v mktemp >/dev/null || die "mktemp is required."
 
     WORKDIR="$(mktemp -d -t kelmora.XXXXXX)"
 
-    note "Downloading latest Kelmora installer..."
+    local archive="${WORKDIR}/repo.tar.gz"
+
+    note "Downloading latest Kelmora..."
 
     fetch \
-        "https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}/kelmora-installer" \
-        "${WORKDIR}/kelmora-installer"
+        "https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz" \
+        "${archive}"
 
-    chmod +x "${WORKDIR}/kelmora-installer"
+    note "Extracting..."
 
-    install -d "${WORKDIR}/lib"
+    tar -xzf "${archive}" -C "${WORKDIR}"
 
-    note "Downloading required libraries..."
+    local ROOT="${WORKDIR}/$(basename "${REPOSITORY}")-${BRANCH}"
 
-    fetch \
-        "https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}/lib/common.sh" \
-        "${WORKDIR}/lib/common.sh"
+    [[ -f "${ROOT}/kelmora-installer" ]] || die "kelmora-installer not found."
 
-    fetch \
-        "https://raw.githubusercontent.com/${REPOSITORY}/${BRANCH}/lib/platform.sh" \
-        "${WORKDIR}/lib/platform.sh"
-
-    chmod +x "${WORKDIR}/lib/"*.sh
+    chmod +x "${ROOT}/kelmora-installer"
 
     note "Starting Kelmora..."
 
-    cd "${WORKDIR}"
+    cd "${ROOT}"
 
     exec bash ./kelmora-installer
 }
