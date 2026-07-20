@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
+<<<<<<< Updated upstream
 # shellcheck shell=bash
 # ==============================================================================
 # 🌌 KELMORA CLOUD OS - THE SINGULARITY ENGINE (MODULAR)
 # ==============================================================================
+=======
+# Kelmora Bootstrap Installer
+# Downloads the latest Kelmora repository from GitHub and starts the installer.
+>>>>>>> Stashed changes
 
 # ------------------------------------------------------------------------------
 # [1. STRICT EXECUTION ENVIRONMENT & GLOBAL PATHS]
@@ -234,6 +239,7 @@ _deploy_visual_identity() {
     install -d -m 0755 "${CONFIG_DIR}"
     install -d -m 0755 "${CONFIG_DIR}/zellij/themes"
 
+<<<<<<< Updated upstream
     cat << 'EOF' > "${CONFIG_DIR}/starship.toml"
 add_newline = false
 command_timeout = 1000
@@ -268,6 +274,12 @@ EOF
 theme "kelmora"
 default_layout "compact"
 EOF
+=======
+    [[ $EUID -eq 0 ]] || die "Run using sudo."
+
+    command -v tar >/dev/null || die "tar is required."
+    command -v mktemp >/dev/null || die "mktemp is required."
+>>>>>>> Stashed changes
 
     cat << 'EOF' > "${CONFIG_DIR}/zellij/themes/kelmora.kdl"
 themes {
@@ -287,6 +299,7 @@ themes {
 }
 EOF
 
+<<<<<<< Updated upstream
     cat << 'EOF' > "${CONFIG_DIR}/logo.txt"
     //\       K E L M O R A
    //  \      C L O U D   O S
@@ -303,6 +316,31 @@ EOF
   "modules": ["title", "separator", "os", "host", "kernel", "uptime", "packages", "shell", "cpu", "memory", "swap", "disk", "localip", "break", "colors"]
 }
 EOF
+=======
+    local archive="${WORKDIR}/repo.tar.gz"
+
+    note "Downloading latest Kelmora..."
+
+    fetch \
+        "https://github.com/${REPOSITORY}/archive/refs/heads/${BRANCH}.tar.gz" \
+        "${archive}"
+
+    note "Extracting..."
+
+    tar -xzf "${archive}" -C "${WORKDIR}"
+
+    local ROOT="${WORKDIR}/$(basename "${REPOSITORY}")-${BRANCH}"
+
+    [[ -f "${ROOT}/kelmora-installer" ]] || die "kelmora-installer not found."
+
+    chmod +x "${ROOT}/kelmora-installer"
+
+    note "Starting Kelmora..."
+
+    cd "${ROOT}"
+
+    exec bash ./kelmora-installer
+>>>>>>> Stashed changes
 }
 
 # ------------------------------------------------------------------------------
