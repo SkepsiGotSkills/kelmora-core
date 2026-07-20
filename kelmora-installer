@@ -50,7 +50,13 @@ EOF
 }
 
 main() {
-    local command="onboard"
+
+# If launched via curl | bash, reconnect stdin to the terminal.
+if [[ ! -t 0 && -r /dev/tty ]]; then
+    exec </dev/tty
+fi
+
+local command="onboard"
     if [[ ${1:-} == "--help" || ${1:-} == "-h" ]]; then
         usage
         return 0
