@@ -479,6 +479,8 @@ _onboarding_ui() {
     esac
 }
 
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# We intercept the execution. The ":-" tells strict-mode to default to an empty string if unbound.
+# If BASH_SOURCE is empty (piped via curl), or matches $0 (executed directly), we launch the UI.
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]] || [[ -z "${BASH_SOURCE[0]:-}" ]]; then
     _onboarding_ui
 fi
